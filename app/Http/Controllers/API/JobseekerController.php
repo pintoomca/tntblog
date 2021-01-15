@@ -3,7 +3,7 @@
 
 namespace App\Http\Controllers\API;
 
-
+use JWTAuth;
 use Illuminate\Http\Request;
 use App\Http\Controllers\API\BaseController as BaseController;
 use App\Jobseeker;
@@ -17,9 +17,33 @@ class JobseekerController extends BaseController
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    protected $user;
+
+    public function __construct()
     {
-        $jobseekers = Jobseeker::all();
+        $this->user = JWTAuth::parseToken()->authenticate();
+    }
+    public function index(Request $request)
+    {
+        if(!empty($request->name))
+        {
+            $params[] = ['name', 'like', '%'.$request->name.'%'];
+        }
+        if(!empty($request->location))
+        {
+            $params[] = ['location', 'like', '%'.$request->location.'%'];
+        }
+        if(!empty($request->email))
+        {
+            $params[] = ['email', 'like', '%'.$request->email.'%'];
+        }
+        if(!empty($request->desciption))
+        {
+            $params[] = ['desciption', 'like', '%'.$request->desciption.'%'];
+        }
+        $skip = ($request->skip != '')? $request->skip:'0';
+        $limit = ($request->limit != '')? $request->limit:'10000';
+        $jobseekers = Jobseeker::where($params)->skip($skip)->take($limit)->get();
 
 
         return $this->sendResponse($jobseekers->toArray(), 'Jobseekers retrieved successfully.');
@@ -40,15 +64,18 @@ class JobseekerController extends BaseController
             'email' => 'required',
             'location' => 'required',
             'description' => 'required',
-            'profile_pic' => 'required'
+            'profile_pic' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
-
+        $user = JWTAuth::user();
+        $input['user_id'] = $user['id'];
         if($validator->fails()){
             return $this->sendError('Validation Error.', $validator->errors());
         }
-
-
+        if($request->hasFile('profile_pic'))
+        {
+            $input['profile_pic'] = $request->file('profile_pic')->store('images','public');
+        }
         $jobseeker = Jobseeker::create($input);
 
 
@@ -83,8 +110,9 @@ class JobseekerController extends BaseController
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, Jobseeker $jobseeker)
+    public function update($id=null, Request $request)
     {
+        $jobseeker = Jobseeker::find($id);
         $input = $request->all();
 
 
@@ -93,20 +121,22 @@ class JobseekerController extends BaseController
             'email' => 'required',
             'location' => 'required',
             'description' => 'required',
-            'profile_pic' => 'required'
+            'profile_pic' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
 
         if($validator->fails()){
             return $this->sendError('Validation Error.', $validator->errors());
         }
-
-
+        if($request->hasFile('profile_pic'))
+        {
+            $input['profile_pic'] = $request->file('profile_pic')->store('images','public');
+        }
+        $jobseeker->profile_pic = $input['profile_pic'];
         $jobseeker->name = $input['name'];
         $jobseeker->email = $input['email'];
         $jobseeker->location = $input['location'];
         $jobseeker->description = $input['description'];
-        $jobseeker->profile_pic = $input['profile_pic'];
         $jobseeker->save();
 
 

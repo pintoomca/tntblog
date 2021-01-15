@@ -17,4 +17,9 @@ class Jobseeker extends Model
     protected $fillable = [
         'name', 'email', 'location', 'description', 'profile_pic'
     ];
+
+    public function images()
+    {
+        return $this->hasMany(Gallery::class);
+    }
 }
